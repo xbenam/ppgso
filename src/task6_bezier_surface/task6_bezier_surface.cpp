@@ -42,8 +42,15 @@ private:
   glm::mat4 modelMatrix{1.0f};
 
   glm::vec3 bezierPoint(const glm::vec3 controlPoints[4], float t) {
-    // TODO: Compute 3D point on bezier curve
-    return {};
+      glm::vec3 p01 = glm::lerp(controlPoints[0], controlPoints[1], t);
+      glm::vec3 p12 = glm::lerp(controlPoints[1], controlPoints[2], t);
+      glm::vec3 p23 = glm::lerp(controlPoints[2], controlPoints[3], t);
+
+      glm::vec3 p0112 = glm::lerp(p01, p12, t);
+      glm::vec3 p1223 = glm::lerp(p12, p23, t);
+
+      glm::vec3 p01121223 = glm::lerp(p0112, p1223, t);
+    return p01121223;
   }
 
   ppgso::Shader program{texture_vert_glsl, texture_frag_glsl};
@@ -62,7 +69,12 @@ public:
       for (unsigned int j = 0; j < PATCH_SIZE; j++) {
         // TODO: Compute points on the bezier patch
         // HINT: Compute u, v coordinates
+          glm::vec3 newBez[4];
+          for(unsigned int k = 0; k < 4; k++)
+              newBez[k] = bezierPoint(controlPoints[k],(float)i/(float)PATCH_SIZE);
+          vertices.push_back(bezierPoint(newBez,(float)j/(float)PATCH_SIZE));
 
+          texCoords.emplace_back((float)i/(float)PATCH_SIZE,1.0f - (float)j/(float)PATCH_SIZE);
         // vertices.push_back(??);
         // texCoords.push_back(??);
       }
@@ -75,6 +87,8 @@ public:
         // indices.push_back(??);
         // indices.push_back(??);
 
+          mesh.push_back({i + PATCH_SIZE * j ,i + PATCH_SIZE * (j-1), (i-1) + PATCH_SIZE * j});
+          mesh.push_back({(i - 1) + PATCH_SIZE * j ,i + PATCH_SIZE * (j-1), (i-1) + PATCH_SIZE * (j-1)});
         // TODO: Compute indices for triangle 2
         // indices.push_back(??);
         // indices.push_back(??);
@@ -123,7 +137,11 @@ public:
   // Set the object transformation matrix
   void update() {
     // TODO: Compute transformation by scaling, rotating and then translating the shape
-    // modelMatrix = ??
+     modelMatrix = translate(glm::mat4{1}, position) *
+                          rotate(glm::mat4{1}, rotation.x, {1,0,0}) *
+                          rotate(glm::mat4{1}, rotation.y, {0,1,0}) *
+                          rotate(glm::mat4{1}, rotation.z, {0,0,1}) *
+                          glm::scale(glm::mat4{1},scale);
   }
 
   // Draw polygons
@@ -151,6 +169,8 @@ public:
     glBindVertexArray(vao);
     // TODO: Use correct rendering mode to draw the result
     //glDrawElements(??);
+      glDrawElements(GL_TRIANGLES, (GLsizei) mesh.size() * 3, GL_UNSIGNED_INT, 0);
+
   };
 };
 
@@ -158,10 +178,14 @@ class BezierSurfaceWindow : public ppgso::Window {
 private:
   // Define 16 control points
   glm::vec3 controlPoints[4][4]{
-      { {-1,1,0}, {-0.5,1,0}, {.5,1,0}, {1,1,3}, },
-      { {-1,.5,0}, {-0.5,.5,0}, {.5,.5,0}, {1,.5,0}, },
-      { {-1,-.5,0}, {-0.5,-.5,0}, {.5,-.5,0}, {1,-.5,-1}, },
-      { {-1,-1,3}, {-0.5,-1,0}, {.5,-1,0}, {1,-1,0}, },
+          { {-.5,-.5,0}, {0,-.5,0},{.5,-.5,0},{1,-.5,0} },
+          { {-.5,0,0}, {0.5,0,0}, {1,0,0}, {1.5,0.5,0} },
+          { {-.5,.5,0}, {0.5,0.5,0}, {1,0.5,0}, {1.5,0.5,0}, },
+          { {-.5,1,0}, {0.5,1,0}, {1,1,0}, {1.5,1,0} },
+//      { {-1,1,0}, {-0.5,1,0}, {.5,1,0}, {1,1,3} },
+//      { {-1,.5,0}, {-0.5,.5,0}, {.5,.5,0}, {1,.5,0} },
+//      { {-1,-.5,0}, {-0.5,-.5,0}, {.5,-.5,0}, {1,-.5,-1} },
+//      { {-1,-1,3}, {-0.5,-1,0}, {.5,-1,0}, {1,-1,0} },
   };
 
   BezierPatch bezier{controlPoints};
@@ -183,7 +207,27 @@ public:
 
     // Move and Render shape
     auto time = (float) glfwGetTime();
-    bezier.rotation = {0,0,time};
+
+//    for(int i=1; i<=2; i++)
+//    {
+//        for(int j=1; j<=2; j++)
+//        {
+//            controlPoints[i][j][2] = static_cast<float>(std::sin(time + static_cast<float>(j) + static_cast<float>(i)));
+//        }
+//    }
+//     waving flag
+    for(int i=0; i<4; i++)
+    {
+        for(int j=0; j<4; j++)
+        {
+            controlPoints[i][j][2] = static_cast<float>(std::sin(time + static_cast<float>(j) + static_cast<float>(i / 3.14)));
+        }
+    }
+
+
+    BezierPatch a{controlPoints};
+    bezier = a;
+    bezier.rotation = {time*0.3,0, 0};
     bezier.update();
     bezier.render();
   }
